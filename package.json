@@ -5,7 +5,7 @@
   "scripts": {
     "start": "npx nodemon src/index.ts",
     "swagger": "node swagger/swagger.js",
-    "build": "tsc && prisma generate"
+    "build": "tsc && prisma generate && next build"
   },
   "keywords": [],
   "author": "",
