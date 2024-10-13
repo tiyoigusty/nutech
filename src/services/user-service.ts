@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { UserDTO } from "../dtos/user-dto";
-import { v2 as cloudinary } from "cloudinary";
+import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
+import streamifier from "streamifier";
 
 const prisma = new PrismaClient();
 
@@ -48,7 +49,42 @@ async function editUser(email: string, data: UserDTO) {
   }
 }
 
-async function editPhoto(email: string, file: string) {
+// async function editPhoto(email: string, file: string) {
+//   try {
+//     cloudinary.config({
+//       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+//       api_key: process.env.CLOUDINARY_API_KEY,
+//       api_secret: process.env.CLOUDINARY_API_SECRET,
+//     });
+
+//     let imageURL;
+
+//     if (file) {
+//       const upload = await cloudinary.uploader.upload(file, {
+//         upload_preset: "nutech",
+//       });
+//       imageURL = upload.secure_url;
+//     }
+
+//     const query = `
+//       UPDATE users
+//       SET profile_image = $1
+//       WHERE email = $2
+//       RETURNING profile_image;
+//     `;
+//     const user = await prisma.$queryRawUnsafe(query, imageURL, email);
+
+//     return user;
+//   } catch (error) {
+//     if (error instanceof Error) {
+//       throw new Error(error.message);
+//     } else {
+//       throw new Error("An unknown error occurred");
+//     }
+//   }
+// }
+
+async function editPhoto(email: string, fileBuffer: Buffer) {
   try {
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -58,10 +94,19 @@ async function editPhoto(email: string, file: string) {
 
     let imageURL;
 
-    if (file) {
-      const upload = await cloudinary.uploader.upload(file, {
-        upload_preset: "nutech",
+    if (fileBuffer) {
+      const upload: UploadApiResponse = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { upload_preset: "nutech" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result as UploadApiResponse);
+          }
+        );
+
+        streamifier.createReadStream(fileBuffer).pipe(stream); // Upload buffer menggunakan stream
       });
+
       imageURL = upload.secure_url;
     }
 
@@ -75,11 +120,9 @@ async function editPhoto(email: string, file: string) {
 
     return user;
   } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(error.message);
-    } else {
-      throw new Error("An unknown error occurred");
-    }
+    throw new Error(
+      error instanceof Error ? error.message : "An unknown error occurred"
+    );
   }
 }
 
